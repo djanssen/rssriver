@@ -202,6 +202,26 @@ $ curl -XPUT 'localhost:9200/_river/lefigaro/_meta' -d '{
 }'
 ```
 
+HTTP proxy
+---------------------
+
+A HTTP proxy can be defined with proxyhost and proxyport :
+
+```sh
+$ curl -XPUT 'localhost:9200/_river/lemonde/_meta' -d '{
+  "type": "rss",
+  "rss": {
+    "proxyhost" : "proxyserver.domain",
+    "proxyport" : 3128,
+    "feeds" : [ {
+    	"name": "lemonde",
+    	"url": "http://www.lemonde.fr/rss/une.xml"
+    	}
+    ]
+  }
+}'
+```
+
 Behind the scene
 ================
 

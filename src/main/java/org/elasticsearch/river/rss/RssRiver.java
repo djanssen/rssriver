@@ -45,6 +45,9 @@ import org.elasticsearch.river.RiverSettings;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.Proxy;
+import java.net.InetSocketAddress;
+import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Map;
@@ -64,6 +67,11 @@ public class RssRiver extends AbstractRiverComponent implements River {
 
 	private final String typeName;
 
+        private final String proxyhost;
+
+        private final int proxyport;
+
+
 	private volatile ArrayList<Thread> threads;
 
 	private volatile boolean closed = false;
@@ -79,7 +87,10 @@ public class RssRiver extends AbstractRiverComponent implements River {
 
 		if (settings.settings().containsKey("rss")) {
 			Map<String, Object> rssSettings = (Map<String, Object>) settings.settings().get("rss");
-			
+
+                        proxyhost = XContentMapValues.nodeStringValue(rssSettings.get("proxyhost"), null);
+                        proxyport = XContentMapValues.nodeIntegerValue(rssSettings.get("proxyport"), 3128);
+
 			// Getting feeds array
 			boolean array = XContentMapValues.isArray(rssSettings.get("feeds"));
 			if (array) {
@@ -110,6 +121,8 @@ public class RssRiver extends AbstractRiverComponent implements River {
 			int updateRate = 15 * 60 * 1000;
 			feedsDefinition = new ArrayList<RssRiverFeedDefinition>(1);
 			feedsDefinition.add(new RssRiverFeedDefinition("lemonde", url, updateRate, false));
+                        proxyhost = null;
+                        proxyport = 3128;
 		}
 
 		
@@ -178,10 +191,19 @@ public class RssRiver extends AbstractRiverComponent implements River {
 	
 	private SyndFeed getFeed(String url) {
 		try {
-			URL feedUrl = new URL(url);
+                        URLConnection conn = null;
+                        if (proxyhost != null) {
+                            Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyhost, proxyport));
+                            conn = new URL(url).openConnection(proxy);
+                        } else {
+                            conn = new URL(url).openConnection();
+                        }
+
+
+
 			SyndFeedInput input = new SyndFeedInput();
             input.setPreserveWireFeed(true);
-			SyndFeed feed = input.build(new XmlReader(feedUrl));
+			SyndFeed feed = input.build(new XmlReader(conn));
 			return feed;
 		} catch (MalformedURLException e) {
 			logger.error("RSS Url is incorrect : [{}].", url);
