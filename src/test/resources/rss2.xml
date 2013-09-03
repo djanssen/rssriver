@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<rss version="2.0"
+     xmlns="http://backend.userland.com/rss2"
+     xmlns:blogChannel="http://backend.userland.com/blogChannelModule"
+     xmlns:financial="http://www.example.com/financial#"
+     xmlns:airplanes="http://www.foobar.com/ns/airplanes/">
+
+<channel>
+  <title>Scripting News</title>
+  <link>http://www.scripting.com/</link>
+  <description>Here we are</description>
+  <blogChannel:blogRoll>http://radio.weblogs.com/file.opml</blogChannel:blogRoll>
+  <blogChannel:mySubscriptions>http://ra/file.opml</blogChannel:mySubscriptions>
+  <blogChannel:blink>http://inessential.com/</blogChannel:blink>
+  <item>
+    <title>A simple example 1</title>
+    <description>A simple example 1</description>
+	<guid>http://some.server.com/weblogItem3207</guid>
+    <airplanes:banking>Turn the rudder 45 degrees to the left.</airplanes:banking>
+    <airplanes:color>blue</airplanes:color>
+    <airplanes:date>2011-11-10T09:21:15Z</airplanes:date>
+    <financial:banking>Bank of Montreal</financial:banking>
+  </item>
+  <item>
+    <title>A simple example 2</title>
+    <description>A simple example 2</description>
+	<guid>http://some.server.com/weblogItem3208</guid>
+    <airplanes:banking>Turn the rudder 90 degrees to the right.</airplanes:banking>
+    <airplanes:color>blue</airplanes:color>
+    <financial:banking>Bank of London</financial:banking>
+  </item>
+</channel>
+
+</rss> 
