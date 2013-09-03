@@ -49,7 +49,8 @@ public class RssToJson {
 	out.field("description", message.getDescription() != null ? message.getDescription().getValue() : null);
 	out.field("link", message.getLink());
 	out.field("publishedDate", message.getPublishedDate());
-         out.field("source", message.getSource());
+        out.field("updatedDate", message.getUpdatedDate());
+        out.field("source", message.getSource());
         if (latitude.size() > 0) {
             out.field("location", latitude);
         }
@@ -57,6 +58,10 @@ public class RssToJson {
             out.field("river", riverName);
         }
 
+        // process first content only
+        if (contents != null && !contents.isEmpty()) {
+            out.field("content", contents.get(0).getValue());
+        }
       
         // process foreign markup elements
         // following the index destination mapping

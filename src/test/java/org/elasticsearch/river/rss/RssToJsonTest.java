@@ -34,7 +34,7 @@ import static org.junit.Assert.*;
 
 public class RssToJsonTest {
 
-    public static final String JSON = "{\"feedname\":null,\"title\":\"title\",\"author\":\"\",\"description\":\"desc\",\"link\":\"http://link.com/abc\",\"publishedDate\":\"2011-11-10T06:29:02.000Z\",\"source\":null,\"location\":{\"lon\":12.4839019775391,\"lat\":41.8947384616695}}";
+    public static final String JSON = "{\"feedname\":null,\"title\":\"title\",\"author\":\"\",\"description\":\"desc\",\"link\":\"http://link.com/abc\",\"publishedDate\":\"2011-11-10T06:29:02.000Z\",\"updatedDate\":null,\"source\":null,\"location\":{\"lon\":12.4839019775391,\"lat\":41.8947384616695}}";
     /*
      *      RSS 2.0 -> JSON example
      *
@@ -60,6 +60,7 @@ public class RssToJsonTest {
      *      "description": "A simple example 1",
      *      "link": null,
      *      "publishedDate": null,
+     *      "updatedDate": null,
      *      "source": null,
      *      "airplanes": {
      *          "banking": "Turn the rudder 45 degrees to the left.",
@@ -71,8 +72,8 @@ public class RssToJsonTest {
      *          }
      *  }
      */
-    public static final String[] JSON_2 = { "{\"feedname\":null,\"title\":\"A simple example 1\",\"author\":\"\",\"description\":\"A simple example 1\",\"link\":null,\"publishedDate\":null,\"source\":null,\"airplanes\":{\"banking\":\"Turn the rudder 45 degrees to the left.\",\"color\":\"blue\",\"date\":\"2011-11-10T09:21:15Z\"},\"financial\":{\"banking\":\"Bank of Montreal\"}}", 
-                                            "{\"feedname\":null,\"title\":\"A simple example 2\",\"author\":\"\",\"description\":\"A simple example 2\",\"link\":null,\"publishedDate\":null,\"source\":null,\"airplanes\":{\"banking\":\"Turn the rudder 90 degrees to the right.\",\"color\":\"blue\"},\"financial\":{\"banking\":\"Bank of London\"}}"};
+    public static final String[] JSON_2 = { "{\"feedname\":null,\"title\":\"A simple example 1\",\"author\":\"\",\"description\":\"A simple example 1\",\"link\":null,\"publishedDate\":null,\"updatedDate\":null,\"source\":null,\"airplanes\":{\"banking\":\"Turn the rudder 45 degrees to the left.\",\"color\":\"blue\",\"date\":\"2011-11-10T09:21:15Z\"},\"financial\":{\"banking\":\"Bank of Montreal\"}}", 
+                                            "{\"feedname\":null,\"title\":\"A simple example 2\",\"author\":\"\",\"description\":\"A simple example 2\",\"link\":null,\"publishedDate\":null,\"updatedDate\":null,\"source\":null,\"airplanes\":{\"banking\":\"Turn the rudder 90 degrees to the right.\",\"color\":\"blue\"},\"financial\":{\"banking\":\"Bank of London\"}}"};
 
 
     @Test /* this test should be moved somewhere else */
