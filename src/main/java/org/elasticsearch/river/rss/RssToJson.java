@@ -20,7 +20,6 @@
 package org.elasticsearch.river.rss;
 
 import com.sun.syndication.feed.synd.SyndContent;
-import java.util.Date;
 import java.util.List;
 import org.jdom.Element;
 import com.sun.syndication.feed.module.georss.GeoRSSModule;
@@ -73,9 +72,9 @@ public class RssToJson {
             for (Element foreignMarkup : foreignMarkups) {
                 String prefix = foreignMarkup.getNamespacePrefix();
                 String fieldName = foreignMarkup.getName();
-                String fieldValue = foreignMarkup.getValue();
-
-                if (lastPrefix != prefix) {
+                String stringValue = foreignMarkup.getValue();
+                Object fieldValue =  JSONValue(stringValue);
+                 if (lastPrefix != prefix) {
 
                     if (lastPrefix != null && !lastPrefix.equals("")) {
                         out = out.endObject();
@@ -110,6 +109,38 @@ public class RssToJson {
         }
         return latitude;
     }
+
+    private static Object JSONValue(String value)
+    {
+        // null object
+        if (value == null) {
+             return null;
+        }
+
+        // boolean object
+        if(value.equalsIgnoreCase("true") || value.equalsIgnoreCase("false"))
+            return Boolean.parseBoolean(value);
+
+        // 'number' object
+        try {  return Short.parseShort(value); }
+        catch(NumberFormatException nfe) {}
+
+        try {  return Integer.parseInt(value); }
+        catch(NumberFormatException nfe) {}
+
+        try {  return Long.parseLong(value); }
+        catch(NumberFormatException nfe) {}
+
+        try {  return Float.parseFloat(value); }
+        catch(NumberFormatException nfe) {}
+
+        try {  return Double.parseDouble(value); } 
+        catch(NumberFormatException nfe) {}
+
+        // return string object by default
+        return value;
+    }
+
 }
 
 

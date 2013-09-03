@@ -18,6 +18,9 @@
 	<guid>http://some.server.com/weblogItem3207</guid>
     <airplanes:banking>Turn the rudder 45 degrees to the left.</airplanes:banking>
     <airplanes:color>blue</airplanes:color>
+    <airplanes:enabled>true</airplanes:enabled>
+    <airplanes:size>213.124</airplanes:size>
+    <airplanes:delay>-45</airplanes:delay>
     <airplanes:date>2011-11-10T09:21:15Z</airplanes:date>
     <financial:banking>Bank of Montreal</financial:banking>
   </item>

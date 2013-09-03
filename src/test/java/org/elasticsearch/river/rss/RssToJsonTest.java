@@ -72,7 +72,7 @@ public class RssToJsonTest {
      *          }
      *  }
      */
-    public static final String[] JSON_2 = { "{\"feedname\":null,\"title\":\"A simple example 1\",\"author\":\"\",\"description\":\"A simple example 1\",\"link\":null,\"publishedDate\":null,\"updatedDate\":null,\"source\":null,\"airplanes\":{\"banking\":\"Turn the rudder 45 degrees to the left.\",\"color\":\"blue\",\"date\":\"2011-11-10T09:21:15Z\"},\"financial\":{\"banking\":\"Bank of Montreal\"}}", 
+    public static final String[] JSON_2 = { "{\"feedname\":null,\"title\":\"A simple example 1\",\"author\":\"\",\"description\":\"A simple example 1\",\"link\":null,\"publishedDate\":null,\"updatedDate\":null,\"source\":null,\"airplanes\":{\"banking\":\"Turn the rudder 45 degrees to the left.\",\"color\":\"blue\",\"enabled\":true,\"size\":213.124,\"delay\":-45,\"date\":\"2011-11-10T09:21:15Z\"},\"financial\":{\"banking\":\"Bank of Montreal\"}}",
                                             "{\"feedname\":null,\"title\":\"A simple example 2\",\"author\":\"\",\"description\":\"A simple example 2\",\"link\":null,\"publishedDate\":null,\"updatedDate\":null,\"source\":null,\"airplanes\":{\"banking\":\"Turn the rudder 90 degrees to the right.\",\"color\":\"blue\"},\"financial\":{\"banking\":\"Bank of London\"}}"};
 
 
