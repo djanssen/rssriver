@@ -19,6 +19,7 @@
 
 package org.elasticsearch.river.rss;
 
+import java.util.HashSet;
 import com.sun.syndication.feed.rss.Channel;
 import com.sun.syndication.feed.synd.SyndEntry;
 import com.sun.syndication.feed.synd.SyndFeed;
@@ -96,11 +97,21 @@ public class RssRiver extends AbstractRiverComponent implements River {
 			if (array) {
 				ArrayList<Map<String, Object>> feeds = (ArrayList<Map<String, Object>>) rssSettings.get("feeds");
 				feedsDefinition = new ArrayList<RssRiverFeedDefinition>(feeds.size());
+                                HashSet feedNames = new HashSet(feeds.size());
 				for (Map<String, Object> feed : feeds) {
 					String feedname = XContentMapValues.nodeStringValue(feed.get("name"), null);
 					String url = XContentMapValues.nodeStringValue(feed.get("url"), null);
 					int updateRate  = XContentMapValues.nodeIntegerValue(feed.get("update_rate"), 15 * 60 * 1000);
-                    boolean ignoreTtl = XContentMapValues.nodeBooleanValue(feed.get("ignore_ttl"), false);
+                                        boolean ignoreTtl = XContentMapValues.nodeBooleanValue(feed.get("ignore_ttl"), false);
+
+                                        if (feedname == null || feedname.isEmpty() || feedNames.contains(feedname)) {
+                                            String msg = "RSS [%s] name is incorrect : [%s].";
+                                            msg = msg.format(url, feedname);
+                                            logger.error(msg);
+                                            throw new MalformedURLException(msg);
+                                        }
+
+                                        feedNames.add(feedname);
 					feedsDefinition.add(new RssRiverFeedDefinition(feedname, url, updateRate, ignoreTtl));
 				}
 				
@@ -255,7 +266,7 @@ public class RssRiver extends AbstractRiverComponent implements River {
                     Date feedDate = feed.getPublishedDate();
                     if (logger.isDebugEnabled()) logger.debug("Feed publish date is {}", feedDate);
 
-                    String lastupdateField = "_lastupdated_" + UUID.nameUUIDFromBytes(url.getBytes()).toString();
+                    String lastupdateField = "_lastupdated_" + feedname;
                     Date lastDate = getLastDateFromRiver(lastupdateField);
                     // Comparing dates to see if we have something to do or not
                     if (lastDate == null || (feedDate != null && feedDate.after(lastDate))) {
