@@ -19,6 +19,8 @@
 
 package org.elasticsearch.river.rss;
 
+import com.sun.syndication.feed.synd.SyndLinkImpl;
+import java.util.List;
 import java.util.HashSet;
 import com.sun.syndication.feed.rss.Channel;
 import com.sun.syndication.feed.synd.SyndEntry;
@@ -249,17 +251,32 @@ public class RssRiver extends AbstractRiverComponent implements River {
         @SuppressWarnings("unchecked")
 		@Override
 		public void run() {
+
+            String currentUrl = url;
+
             while (true) {
 				if (closed) {
-					return;
+                                        if (logger.isDebugEnabled()) logger.debug("Rss river [{}] closed", feedname);
+                			return;
 				}
 				
 				// Let's call the Rss flow
-				SyndFeed feed = getFeed(url);
+				SyndFeed feed = getFeed(currentUrl);
+                                String nextUrl = null;
+                                int  updatedCount = 0;
                 if (feed != null) {
-                    if (logger.isDebugEnabled()) logger.debug("Reading feed from {}", url);
+                    if (logger.isDebugEnabled()) logger.debug("Reading feed from {}", currentUrl);
                     Date feedDate = feed.getPublishedDate();
                     if (logger.isDebugEnabled()) logger.debug("Feed publish date is {}", feedDate);
+
+
+
+                    // Get 'next' url (RSS/Atom pagination)
+                    for (SyndLinkImpl link : (List<SyndLinkImpl>) feed.getLinks()) {
+                        if (link.getRel() != null && link.getRel().equalsIgnoreCase("next")) {
+                            nextUrl = link.getHref();
+                        }
+                    }
 
                     String lastupdateField = "_lastupdated_" + feedname;
                     Date lastDate = getLastDateFromRiver(lastupdateField);
@@ -288,8 +305,9 @@ public class RssRiver extends AbstractRiverComponent implements River {
                                 GetResponse oldMessage = client.prepareGet(indexName, typeName, id).execute().actionGet();
                                 if (!oldMessage.isExists()) {
                                     bulk.add(indexRequest(indexName).type(typeName).id(id).source(toJson(message, riverName.getName(), feedname)));
+                                    updatedCount++;
 
-                                    if (logger.isDebugEnabled()) logger.debug("FeedMessage update detected for source [{}]", feedname != null ? feedname : "undefined");
+                                    if (logger.isDebugEnabled()) logger.debug("FeedMessage [{}] update detected for source [{}]", id, feedname != null ? feedname : "undefined");
                                     if (logger.isTraceEnabled()) logger.trace("FeedMessage is : {}", message);
                                 } else {
                                     if (logger.isTraceEnabled()) logger.trace("FeedMessage {} already exist. Ignoring", id);
@@ -303,16 +321,20 @@ public class RssRiver extends AbstractRiverComponent implements River {
                             bulk.add(indexRequest("_river").type(riverName.name()).id(lastupdateField)
                                     .source(jsonBuilder().startObject().startObject("rss").field(lastupdateField, feedDate).endObject().endObject()));
                         } catch (IOException e) {
+                            updatedCount = 0;
                             logger.warn("failed to add feed message entry to bulk indexing");
                         }
 
                         try {
                             BulkResponse response = bulk.execute().actionGet();
                             if (response.hasFailures()) {
+                                // TODO probably some of them has been updated
+                                updatedCount = 0;
                                 // TODO write to exception queue?
                                 logger.warn("failed to execute" + response.buildFailureMessage());
                             }
                         } catch (Exception e) {
+                            updatedCount = 0;
                             logger.warn("failed to execute bulk", e);
                         }
 
@@ -321,7 +343,7 @@ public class RssRiver extends AbstractRiverComponent implements River {
                         if (logger.isDebugEnabled()) logger.debug("Nothing new in the feed... Relaxing...");
                     }
                 }
-				try {
+		try {
                     // #8 : Use the ttl rss field to auto adjust feed refresh rate
                     if (!ignoreTtl && feed.originalWireFeed() != null && feed.originalWireFeed() instanceof Channel) {
                         Channel channel = (Channel) feed.originalWireFeed();
@@ -335,12 +357,22 @@ public class RssRiver extends AbstractRiverComponent implements River {
                         }
                     }
 
-					if (logger.isDebugEnabled()) logger.debug("Rss river is going to sleep for {} ms", updateRate);
-					Thread.sleep(updateRate);
-				} catch (InterruptedException e1) {
-				}
-			}
+                    if (nextUrl != null && !nextUrl.isEmpty() && updatedCount > 0) {
+                        currentUrl = nextUrl;
+                        nextUrl = null;
+                        if (logger.isDebugEnabled()) logger.debug("Rss river is going to ask for next page");
+                    } else {
+                        currentUrl = url;
+                        nextUrl = null;
+                        if (logger.isDebugEnabled()) logger.debug("Rss river [{}] is going to sleep for {} ms", feedname, updateRate);
+                        Thread.sleep(updateRate);
+                         if (logger.isDebugEnabled()) logger.debug("Rss river [{}] wakeup", feedname);
+                    }
 		}
+                catch (InterruptedException e1) {
+                }
+	}
+}
 
         @SuppressWarnings("unchecked")
 		private Date getLastDateFromRiver(String lastupdateField) {
