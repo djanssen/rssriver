@@ -78,7 +78,6 @@ public class RssRiverTtlTest extends AbstractRssRiverSimpleTest {
 						.startArray("feeds")
 							.startObject()
 								.field("url", url)
-                                                                .field("name", "lemonde")
 								.field("update_rate", update_rate)
 							.endObject()
 						.endArray()
