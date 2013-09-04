@@ -270,9 +270,13 @@ public class RssRiver extends AbstractRiverComponent implements River {
                                 if (message.getDescription() != null) {
                                     description = message.getDescription().getValue();
                                 }
+                                String entryId = "";
+                                if (message.getUri() != null) {
+                                    entryId = message.getUri();
+                                }
 
                                 // Let's define the rule for UUID generation
-                                String id = UUID.nameUUIDFromBytes(description.getBytes()).toString();
+                                String id = (entryId.isEmpty()) ? UUID.nameUUIDFromBytes(description.getBytes()).toString() : entryId;
 
                                 // Let's look if object already exists
                                 GetResponse oldMessage = client.prepareGet(indexName, typeName, id).execute().actionGet();
