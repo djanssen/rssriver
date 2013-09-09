@@ -19,6 +19,8 @@
 
 package org.elasticsearch.river.rss;
 
+import java.util.TimeZone;
+import java.text.SimpleDateFormat;
 import com.sun.syndication.feed.synd.SyndLinkImpl;
 import java.util.List;
 import java.util.HashSet;
@@ -105,11 +107,15 @@ public class RssRiver extends AbstractRiverComponent implements River {
 					String feedname = XContentMapValues.nodeStringValue(feed.get("name"), url);
 					int updateRate  = XContentMapValues.nodeIntegerValue(feed.get("update_rate"), 15 * 60 * 1000);
                                         boolean ignoreTtl = XContentMapValues.nodeBooleanValue(feed.get("ignore_ttl"), false);
+                                        boolean incrementalDates = XContentMapValues.nodeBooleanValue(feed.get("incremental_dates"), false);
+                			String startDate = XContentMapValues.nodeStringValue(feed.get("start_date"), null);
+		                    
                                         if (feedNames.contains(feedname)) {
                                             feedname = UUID.nameUUIDFromBytes(feedname.getBytes()).toString();
                                         }
                                         feedNames.add(feedname);
-					feedsDefinition.add(new RssRiverFeedDefinition(feedname, url, updateRate, ignoreTtl));
+					
+                                        feedsDefinition.add(new RssRiverFeedDefinition(feedname, url, updateRate, ignoreTtl, incrementalDates, startDate));
 				}
 				
 			} else {
@@ -120,7 +126,7 @@ public class RssRiver extends AbstractRiverComponent implements River {
                                 boolean ignoreTtl = XContentMapValues.nodeBooleanValue("ignore_ttl", false);
                                 String feedname = XContentMapValues.nodeStringValue(rssSettings.get("name"), url);
 				feedsDefinition = new ArrayList<RssRiverFeedDefinition>(1);
-				feedsDefinition.add(new RssRiverFeedDefinition(feedname, url, updateRate, ignoreTtl));
+				feedsDefinition.add(new RssRiverFeedDefinition(feedname, url, updateRate, ignoreTtl, false, null));
 			}
 			
 		} else {
@@ -128,7 +134,7 @@ public class RssRiver extends AbstractRiverComponent implements River {
 			logger.warn("You didn't define the rss url. Switching to defaults : [{}]", url);
 			int updateRate = 15 * 60 * 1000;
 			feedsDefinition = new ArrayList<RssRiverFeedDefinition>(1);
-			feedsDefinition.add(new RssRiverFeedDefinition("lemonde", url, updateRate, false));
+			feedsDefinition.add(new RssRiverFeedDefinition("lemonde", url, updateRate, false, false, null));
                         proxyhost = null;
                         proxyport = 3128;
 		}
@@ -199,6 +205,7 @@ public class RssRiver extends AbstractRiverComponent implements River {
 	
 	private SyndFeed getFeed(String url) {
 		try {
+
                         URLConnection conn = null;
                         if (proxyhost != null) {
                             Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyhost, proxyport));
@@ -206,8 +213,6 @@ public class RssRiver extends AbstractRiverComponent implements River {
                         } else {
                             conn = new URL(url).openConnection();
                         }
-
-
 
 			SyndFeedInput input = new SyndFeedInput();
             input.setPreserveWireFeed(true);
@@ -230,14 +235,19 @@ public class RssRiver extends AbstractRiverComponent implements River {
 		private String url;
 		private int updateRate;
 		private String feedname;
-        private boolean ignoreTtl;
+                private boolean ignoreTtl;
+                private boolean incremental;
+                private Date   startDate;
+                private final int max_pagging = 10;
 
-        public RSSParser(String feedname, String url, int updateRate, boolean ignoreTtl) {
+        public RSSParser(String feedname, String url, int updateRate, boolean ignoreTtl, boolean incremental,Date startDate) {
 			this.feedname = feedname;
 			this.url = url;
 			this.updateRate = updateRate;
+			this.incremental = incremental;
+			this.startDate = startDate;
             this.ignoreTtl = ignoreTtl;
-            if (logger.isInfoEnabled()) logger.info("creating rss stream river [{}] for [{}] every [{}] ms",
+            if (logger.isInfoEnabled()) logger.info("Creating rss stream river [{}] for [{}] every [{}] ms",
                     feedname, url, updateRate);
 		}
 
@@ -245,7 +255,10 @@ public class RssRiver extends AbstractRiverComponent implements River {
             this(feedDefinition.getFeedname(),
                     feedDefinition.getUrl(),
                     feedDefinition.getUpdateRate(),
-                    feedDefinition.isIgnoreTtl());
+                    feedDefinition.isIgnoreTtl(),
+                    feedDefinition.isIncrementalDates(),
+                    feedDefinition.getStartDate()
+                    );
         }
 
         @SuppressWarnings("unchecked")
@@ -253,22 +266,36 @@ public class RssRiver extends AbstractRiverComponent implements River {
 		public void run() {
 
             String currentUrl = url;
+            int  pagging = 0;
 
             while (true) {
 				if (closed) {
                                         if (logger.isDebugEnabled()) logger.debug("Rss river [{}] closed", feedname);
                 			return;
 				}
-				
+		
+                                // get last dates for this feed 
+                                String lastupdateField = "_lastupdated_" + feedname;
+                                Date lastDate = getLastDateFromRiver(lastupdateField);
+
+                                // build incremental Url
+                                // we use  ISO8601 UTC format
+                                if (incremental && pagging == 0) {
+                                    SimpleDateFormat dateFormat =  new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+                                    dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+                                    String lastDateStr = dateFormat.format((lastDate == null) ?  startDate : lastDate);
+                                    currentUrl = String.format(url, lastDateStr);
+                                }
+
 				// Let's call the Rss flow
-				SyndFeed feed = getFeed(currentUrl);
+                                if (logger.isDebugEnabled()) logger.debug("Resquesting feed url :  {}", currentUrl);
+ 				SyndFeed feed = getFeed(currentUrl);
                                 String nextUrl = null;
                                 int  updatedCount = 0;
                 if (feed != null) {
                     if (logger.isDebugEnabled()) logger.debug("Reading feed from {}", currentUrl);
                     Date feedDate = feed.getPublishedDate();
                     if (logger.isDebugEnabled()) logger.debug("Feed publish date is {}", feedDate);
-
 
 
                     // Get 'next' url (RSS/Atom pagination)
@@ -278,10 +305,9 @@ public class RssRiver extends AbstractRiverComponent implements River {
                         }
                     }
 
-                    String lastupdateField = "_lastupdated_" + feedname;
-                    Date lastDate = getLastDateFromRiver(lastupdateField);
+               
                     // Comparing dates to see if we have something to do or not
-                    if (lastDate == null || (feedDate != null && feedDate.after(lastDate))) {
+                    if (lastDate == null || incremental || (feedDate != null && feedDate.after(lastDate))) {
                         // We have to send results to ES
                         if (logger.isTraceEnabled()) logger.trace("Feed is updated : {}", feed);
 
@@ -305,9 +331,12 @@ public class RssRiver extends AbstractRiverComponent implements River {
                                 GetResponse oldMessage = client.prepareGet(indexName, typeName, id).execute().actionGet();
                                 if (!oldMessage.isExists()) {
                                     bulk.add(indexRequest(indexName).type(typeName).id(id).source(toJson(message, riverName.getName(), feedname)));
+                                    if (incremental && message.getUpdatedDate() != null) {
+                                        feedDate = message.getUpdatedDate();
+                                    }
                                     updatedCount++;
 
-                                    if (logger.isDebugEnabled()) logger.debug("FeedMessage [{}] update detected for source [{}]", id, feedname != null ? feedname : "undefined");
+                                    //if (logger.isDebugEnabled()) logger.debug("FeedMessage [{}] update detected for source [{}]", id, feedname != null ? feedname : "undefined");
                                     if (logger.isTraceEnabled()) logger.trace("FeedMessage is : {}", message);
                                 } else {
                                     if (logger.isTraceEnabled()) logger.trace("FeedMessage {} already exist. Ignoring", id);
@@ -319,7 +348,7 @@ public class RssRiver extends AbstractRiverComponent implements River {
                             }
                             // We store the lastupdate date
                             bulk.add(indexRequest("_river").type(riverName.name()).id(lastupdateField)
-                                    .source(jsonBuilder().startObject().startObject("rss").field(lastupdateField, feedDate).endObject().endObject()));
+                                    .source(jsonBuilder().startObject().startObject("rss").field("date", feedDate).endObject().endObject()));
                         } catch (IOException e) {
                             updatedCount = 0;
                             logger.warn("failed to add feed message entry to bulk indexing");
@@ -357,16 +386,17 @@ public class RssRiver extends AbstractRiverComponent implements River {
                         }
                     }
 
-                    if (nextUrl != null && !nextUrl.isEmpty() && updatedCount > 0) {
+                    if (nextUrl != null && !nextUrl.isEmpty() && updatedCount > 0 && (!incremental || pagging < max_pagging)) {
                         currentUrl = nextUrl;
                         nextUrl = null;
+                        pagging++;
                         if (logger.isDebugEnabled()) logger.debug("Rss river is going to ask for next page");
                     } else {
+                        pagging = 0;
                         currentUrl = url;
                         nextUrl = null;
                         if (logger.isDebugEnabled()) logger.debug("Rss river [{}] is going to sleep for {} ms", feedname, updateRate);
                         Thread.sleep(updateRate);
-                         if (logger.isDebugEnabled()) logger.debug("Rss river [{}] wakeup", feedname);
                     }
 		}
                 catch (InterruptedException e1) {
@@ -386,7 +416,7 @@ public class RssRiver extends AbstractRiverComponent implements River {
                     Map<String, Object> rssState = (Map<String, Object>) lastSeqGetResponse.getSourceAsMap().get("rss");
 
                     if (rssState != null) {
-                        Object lastupdate = rssState.get(lastupdateField);
+                        Object lastupdate = rssState.get("date");
                         if (lastupdate != null) {
                             String strLastDate = lastupdate.toString();
                             lastDate = ISODateTimeFormat.dateOptionalTimeParser().parseDateTime(strLastDate).toDate();

@@ -19,6 +19,11 @@
 
 package org.elasticsearch.river.rss;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import org.elasticsearch.common.xcontent.support.XContentMapValues;
+
 /**
  * Define an RSS Feed with source (aka short name), url and updateRate attributes
  * @author dadoonet (David Pilato)
@@ -28,18 +33,24 @@ public class RssRiverFeedDefinition {
 	private String feedname;
 	private String url;
 	private int updateRate;
-    private boolean ignoreTtl = false;
-	
+        private boolean ignoreTtl = false;
+	private boolean incrementalDates = false;
+        private Date startDate;
+    
+
 	public RssRiverFeedDefinition() {
 	}
 	
-	public RssRiverFeedDefinition(String feedname, String url, int updateRate, boolean ignoreTtl) {
+	public RssRiverFeedDefinition(String feedname, String url, int updateRate, boolean ignoreTtl, boolean incrementalDates, String startDate) {
 		this.feedname = feedname;
 		this.url = url;
 		this.updateRate = updateRate;
-        this.ignoreTtl = ignoreTtl;
-	}
-	
+                this.ignoreTtl = ignoreTtl;
+                this.incrementalDates = incrementalDates;
+                setStartDate(startDate);
+ 	}
+
+
 	public String getFeedname() {
 		return feedname;
 	}
@@ -60,6 +71,14 @@ public class RssRiverFeedDefinition {
 		return updateRate;
 	}
 
+        public boolean isIncrementalDates() {
+            return incrementalDates;
+	}
+   
+        public Date getStartDate() {
+		return startDate;
+	}
+
 	public void setUpdateRate(int updateRate) {
 		this.updateRate = updateRate;
 	}
@@ -71,4 +90,44 @@ public class RssRiverFeedDefinition {
     public void setIgnoreTtl(boolean ignoreTtl) {
         this.ignoreTtl = ignoreTtl;
     }
+
+       private void setStartDate(String startDate)
+        {
+            if (startDate == null) {
+                Date last7days = new Date();
+                last7days.setTime(last7days.getTime() - (7 * 24 * 60 * 60 * 1000));
+                this.startDate = last7days;
+                return;
+            }
+            try {
+                SimpleDateFormat format =  new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+                this.startDate = format.parse(startDate);
+            }
+            catch(ParseException p0) {
+                try {
+                    SimpleDateFormat format =  new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+                    this.startDate = format.parse(startDate);
+                }
+                catch(ParseException p1) {
+                    try {
+                        SimpleDateFormat format =  new SimpleDateFormat("yyyy-MM-dd'T'HH:mm'Z'");
+                        this.startDate = format.parse(startDate);
+                    }
+                    catch(ParseException p2) {
+                        try {
+                            SimpleDateFormat format =  new SimpleDateFormat("yyyy-MM-dd'T'HH:mm'Z'");
+                            this.startDate = format.parse(startDate);
+                        }
+                        catch(ParseException p3) {
+                            try {
+                                SimpleDateFormat format =  new SimpleDateFormat("yyyy-MM-dd");
+                                this.startDate = format.parse(startDate);
+                            }
+                            catch(ParseException p4) {
+                            }
+                        }
+                    }
+                }
+            }
+        }
 }
