@@ -276,14 +276,18 @@ public class RssRiver extends AbstractRiverComponent implements River {
 		
                                 // get last dates for this feed 
                                 String lastupdateField = "_lastupdated_" + feedname;
-                                Date lastDate = getLastDateFromRiver(lastupdateField);
+                                Date lastFeedDate = null;
+                                Date lastDocDate = null;
+                                retrieveLastDatesFromRiver(lastupdateField, lastFeedDate, lastDocDate);
+
+                                 if (logger.isDebugEnabled()) logger.debug("lastupdateField  :  {}, {}, {}", lastupdateField, lastFeedDate, lastDocDate);
 
                                 // build incremental Url
                                 // we use  ISO8601 UTC format
                                 if (incremental && pagging == 0) {
                                     SimpleDateFormat dateFormat =  new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
                                     dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
-                                    String lastDateStr = dateFormat.format((lastDate == null) ?  startDate : lastDate);
+                                    String lastDateStr = dateFormat.format((lastDocDate == null) ?  startDate : lastDocDate);
                                     currentUrl = String.format(url, lastDateStr);
                                 }
 
@@ -294,8 +298,9 @@ public class RssRiver extends AbstractRiverComponent implements River {
                                 int  updatedCount = 0;
                 if (feed != null) {
                     if (logger.isDebugEnabled()) logger.debug("Reading feed from {}", currentUrl);
-                    Date feedDate = feed.getPublishedDate();
-                    if (logger.isDebugEnabled()) logger.debug("Feed publish date is {}", feedDate);
+                    Date currentFeedDate = feed.getPublishedDate();
+                    Date currentDocDate = null;
+                    if (logger.isDebugEnabled()) logger.debug("Feed publish date is {}", currentFeedDate);
 
 
                     // Get 'next' url (RSS/Atom pagination)
@@ -307,7 +312,7 @@ public class RssRiver extends AbstractRiverComponent implements River {
 
                
                     // Comparing dates to see if we have something to do or not
-                    if (lastDate == null || incremental || (feedDate != null && feedDate.after(lastDate))) {
+                    if (lastFeedDate == null || incremental || (currentFeedDate != null && currentFeedDate.after(lastFeedDate))) {
                         // We have to send results to ES
                         if (logger.isTraceEnabled()) logger.trace("Feed is updated : {}", feed);
 
@@ -331,9 +336,7 @@ public class RssRiver extends AbstractRiverComponent implements River {
                                 GetResponse oldMessage = client.prepareGet(indexName, typeName, id).execute().actionGet();
                                 if (!oldMessage.isExists()) {
                                     bulk.add(indexRequest(indexName).type(typeName).id(id).source(toJson(message, riverName.getName(), feedname)));
-                                    if (incremental && message.getUpdatedDate() != null) {
-                                        feedDate = message.getUpdatedDate();
-                                    }
+                                    currentDocDate = message.getUpdatedDate();
                                     updatedCount++;
 
                                     //if (logger.isDebugEnabled()) logger.debug("FeedMessage [{}] update detected for source [{}]", id, feedname != null ? feedname : "undefined");
@@ -344,11 +347,11 @@ public class RssRiver extends AbstractRiverComponent implements River {
                             }
 
                             if (logger.isTraceEnabled()) {
-                                logger.trace("processing [_seq  ]: [{}]/[{}]/[{}], last_seq [{}]", indexName, riverName.name(), lastupdateField, feedDate);
+                                logger.trace("processing [_seq  ]: [{}]/[{}]/[{}], last_seq [{}]", indexName, riverName.name(), lastupdateField, currentFeedDate);
                             }
                             // We store the lastupdate date
                             bulk.add(indexRequest("_river").type(riverName.name()).id(lastupdateField)
-                                    .source(jsonBuilder().startObject().startObject("rss").field("date", feedDate).endObject().endObject()));
+                                    .source(jsonBuilder().startObject().startObject("rss").field("feed_date", currentFeedDate).field("doc_date", currentDocDate).endObject().endObject()));
                         } catch (IOException e) {
                             updatedCount = 0;
                             logger.warn("failed to add feed message entry to bulk indexing");
@@ -371,8 +374,8 @@ public class RssRiver extends AbstractRiverComponent implements River {
                         // Nothing new... Just relax !
                         if (logger.isDebugEnabled()) logger.debug("Nothing new in the feed... Relaxing...");
                     }
-                }
-		try {
+               
+		
                     // #8 : Use the ttl rss field to auto adjust feed refresh rate
                     if (!ignoreTtl && feed.originalWireFeed() != null && feed.originalWireFeed() instanceof Channel) {
                         Channel channel = (Channel) feed.originalWireFeed();
@@ -385,7 +388,8 @@ public class RssRiver extends AbstractRiverComponent implements River {
                             }
                         }
                     }
-
+                } // end if (feed != null)
+                try {
                     if (nextUrl != null && !nextUrl.isEmpty() && updatedCount > 0 && (!incremental || pagging < max_pagging)) {
                         currentUrl = nextUrl;
                         nextUrl = null;
@@ -401,13 +405,13 @@ public class RssRiver extends AbstractRiverComponent implements River {
 		}
                 catch (InterruptedException e1) {
                 }
-	}
+	} // end while(true)
 }
 
         @SuppressWarnings("unchecked")
-		private Date getLastDateFromRiver(String lastupdateField) {
-            Date lastDate = null;
-            try {
+		private boolean retrieveLastDatesFromRiver(String lastupdateField, Date lastFeedDate, Date lastDocDate) {
+                boolean success = false;
+                try {
                 // Do something
                 client.admin().indices().prepareRefresh("_river").execute().actionGet();
                 GetResponse lastSeqGetResponse =
@@ -416,10 +420,15 @@ public class RssRiver extends AbstractRiverComponent implements River {
                     Map<String, Object> rssState = (Map<String, Object>) lastSeqGetResponse.getSourceAsMap().get("rss");
 
                     if (rssState != null) {
-                        Object lastupdate = rssState.get("date");
-                        if (lastupdate != null) {
-                            String strLastDate = lastupdate.toString();
-                            lastDate = ISODateTimeFormat.dateOptionalTimeParser().parseDateTime(strLastDate).toDate();
+                        Object lastfeed_date = rssState.get("feed_date");
+                        if (lastfeed_date != null) {
+                            String strLastDate = lastfeed_date.toString();
+                            lastFeedDate = ISODateTimeFormat.dateOptionalTimeParser().parseDateTime(strLastDate).toDate();
+                        }
+                        Object lastdoc_date = rssState.get("doc_date");
+                        if (lastdoc_date != null) {
+                            String strLastDate = lastdoc_date.toString();
+                            lastDocDate = ISODateTimeFormat.dateOptionalTimeParser().parseDateTime(strLastDate).toDate();
                         }
                     }
                 } else {
@@ -428,8 +437,9 @@ public class RssRiver extends AbstractRiverComponent implements River {
                 }
             } catch (Exception e) {
                 logger.warn("failed to get _lastupdate, throttling....", e);
+                    success = true;
             }
-            return lastDate;
+            return success;
         }
     }
 }
