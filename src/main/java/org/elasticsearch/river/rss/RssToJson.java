@@ -19,6 +19,7 @@
 
 package org.elasticsearch.river.rss;
 
+import java.util.Date;
 import com.sun.syndication.feed.synd.SyndContent;
 import java.util.List;
 import org.jdom.Element;
@@ -49,6 +50,7 @@ public class RssToJson {
 	out.field("link", message.getLink());
 	out.field("publishedDate", message.getPublishedDate());
         out.field("updatedDate", message.getUpdatedDate());
+        out.field("feedDate", new Date());
         out.field("source", message.getSource());
         if (latitude.size() > 0) {
             out.field("location", latitude);

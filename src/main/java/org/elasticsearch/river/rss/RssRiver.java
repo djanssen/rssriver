@@ -19,6 +19,11 @@
 
 package org.elasticsearch.river.rss;
 
+import org.elasticsearch.action.search.SearchRequestBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.search.SearchHits;
+import org.elasticsearch.search.sort.SortOrder;
+import org.elasticsearch.action.search.SearchType;
 import java.util.TimeZone;
 import java.text.SimpleDateFormat;
 import com.sun.syndication.feed.synd.SyndLinkImpl;
@@ -333,6 +338,9 @@ public class RssRiver extends AbstractRiverComponent implements River {
                                 if (message.getUri() != null) {
                                     entryId = message.getUri();
                                 }
+                                if (message.getUpdatedDate() == null) {
+                                    message.setUpdatedDate(new Date());
+                                }
 
                                 // Let's define the rule for UUID generation
                                 String id = (entryId.isEmpty()) ? UUID.nameUUIDFromBytes(description.getBytes()).toString() : entryId;
@@ -380,7 +388,6 @@ public class RssRiver extends AbstractRiverComponent implements River {
                         // Nothing new... Just relax !
                         if (logger.isDebugEnabled()) logger.debug("Nothing new in the feed... Relaxing...");
                     }
-               
 		
                     // #8 : Use the ttl rss field to auto adjust feed refresh rate
                     if (!ignoreTtl && feed.originalWireFeed() != null && feed.originalWireFeed() instanceof Channel) {
@@ -439,7 +446,22 @@ public class RssRiver extends AbstractRiverComponent implements River {
                     }
                 } else {
                     // First call
-                    if (logger.isDebugEnabled()) logger.debug("{} doesn't exist", lastupdateField);
+                    if (logger.isDebugEnabled()) logger.debug("{} doesn't exist, trying to find previous {} within {} from the same feed {}", lastupdateField, typeName, indexName, feedname);
+
+                    SearchRequestBuilder searchBuilder = client.prepareSearch(indexName);
+                    if (searchBuilder != null) {
+                        SearchHits lastDocs = searchBuilder.setTypes(typeName)
+                                                        .setSearchType(SearchType.DFS_QUERY_THEN_FETCH)
+                                                        .setQuery(QueryBuilders.termQuery("feedname", feedname))
+                                                        .addSort("feedDate", SortOrder.DESC)   // Sort by feedDate
+                                                        .setSize(1)
+                                                        .execute()
+                                                        .actionGet().getHits();
+                        if (lastDocs != null && lastDocs.getTotalHits() > 0) {
+                            result.lastDocDate  = ISODateTimeFormat.dateOptionalTimeParser().parseDateTime(lastDocs.getAt(0).getSource().get("updatedDate").toString()).toDate();
+                        }
+                    }
+
                 }
             } catch (Exception e) {
                 logger.warn("failed to get _lastupdate, throttling....", e);
