@@ -240,6 +240,13 @@ public class RssRiver extends AbstractRiverComponent implements River {
                 private Date   startDate;
                 private final int max_pagging = 10;
 
+
+                private class RiverUpdatedInfo {
+                    public Date lastFeedDate;
+                    public Date lastDocDate;
+                };
+
+
         public RSSParser(String feedname, String url, int updateRate, boolean ignoreTtl, boolean incremental,Date startDate) {
 			this.feedname = feedname;
 			this.url = url;
@@ -276,18 +283,16 @@ public class RssRiver extends AbstractRiverComponent implements River {
 		
                                 // get last dates for this feed 
                                 String lastupdateField = "_lastupdated_" + feedname;
-                                Date lastFeedDate = null;
-                                Date lastDocDate = null;
-                                retrieveLastDatesFromRiver(lastupdateField, lastFeedDate, lastDocDate);
+                                RiverUpdatedInfo riverInfo = retrieveLastDatesFromRiver(lastupdateField);
 
-                                 if (logger.isDebugEnabled()) logger.debug("lastupdateField  :  {}, {}, {}", lastupdateField, lastFeedDate, lastDocDate);
+                                 if (logger.isDebugEnabled()) logger.debug("lastupdateField  :  {}, {}, {}", lastupdateField, riverInfo.lastFeedDate, riverInfo.lastDocDate);
 
                                 // build incremental Url
                                 // we use  ISO8601 UTC format
                                 if (incremental && pagging == 0) {
                                     SimpleDateFormat dateFormat =  new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
                                     dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
-                                    String lastDateStr = dateFormat.format((lastDocDate == null) ?  startDate : lastDocDate);
+                                    String lastDateStr = dateFormat.format((riverInfo.lastDocDate == null) ?  startDate : riverInfo.lastDocDate);
                                     currentUrl = String.format(url, lastDateStr);
                                 }
 
@@ -312,7 +317,7 @@ public class RssRiver extends AbstractRiverComponent implements River {
 
                
                     // Comparing dates to see if we have something to do or not
-                    if (lastFeedDate == null || incremental || (currentFeedDate != null && currentFeedDate.after(lastFeedDate))) {
+                    if (riverInfo.lastFeedDate == null || incremental || (currentFeedDate != null && currentFeedDate.after(riverInfo.lastFeedDate))) {
                         // We have to send results to ES
                         if (logger.isTraceEnabled()) logger.trace("Feed is updated : {}", feed);
 
@@ -336,14 +341,15 @@ public class RssRiver extends AbstractRiverComponent implements River {
                                 GetResponse oldMessage = client.prepareGet(indexName, typeName, id).execute().actionGet();
                                 if (!oldMessage.isExists()) {
                                     bulk.add(indexRequest(indexName).type(typeName).id(id).source(toJson(message, riverName.getName(), feedname)));
-                                    currentDocDate = message.getUpdatedDate();
                                     updatedCount++;
-
                                     //if (logger.isDebugEnabled()) logger.debug("FeedMessage [{}] update detected for source [{}]", id, feedname != null ? feedname : "undefined");
                                     if (logger.isTraceEnabled()) logger.trace("FeedMessage is : {}", message);
                                 } else {
                                     if (logger.isTraceEnabled()) logger.trace("FeedMessage {} already exist. Ignoring", id);
                                 }
+                                // update current date info
+                                currentDocDate = message.getUpdatedDate();
+
                             }
 
                             if (logger.isTraceEnabled()) {
@@ -409,8 +415,8 @@ public class RssRiver extends AbstractRiverComponent implements River {
 }
 
         @SuppressWarnings("unchecked")
-		private boolean retrieveLastDatesFromRiver(String lastupdateField, Date lastFeedDate, Date lastDocDate) {
-                boolean success = false;
+		private RiverUpdatedInfo retrieveLastDatesFromRiver(String lastupdateField) {
+                RiverUpdatedInfo result = new RiverUpdatedInfo();
                 try {
                 // Do something
                 client.admin().indices().prepareRefresh("_river").execute().actionGet();
@@ -423,12 +429,12 @@ public class RssRiver extends AbstractRiverComponent implements River {
                         Object lastfeed_date = rssState.get("feed_date");
                         if (lastfeed_date != null) {
                             String strLastDate = lastfeed_date.toString();
-                            lastFeedDate = ISODateTimeFormat.dateOptionalTimeParser().parseDateTime(strLastDate).toDate();
+                            result.lastFeedDate = ISODateTimeFormat.dateOptionalTimeParser().parseDateTime(strLastDate).toDate();
                         }
                         Object lastdoc_date = rssState.get("doc_date");
                         if (lastdoc_date != null) {
                             String strLastDate = lastdoc_date.toString();
-                            lastDocDate = ISODateTimeFormat.dateOptionalTimeParser().parseDateTime(strLastDate).toDate();
+                            result.lastDocDate = ISODateTimeFormat.dateOptionalTimeParser().parseDateTime(strLastDate).toDate();
                         }
                     }
                 } else {
@@ -437,9 +443,8 @@ public class RssRiver extends AbstractRiverComponent implements River {
                 }
             } catch (Exception e) {
                 logger.warn("failed to get _lastupdate, throttling....", e);
-                    success = true;
             }
-            return success;
+            return result;
         }
     }
 }
