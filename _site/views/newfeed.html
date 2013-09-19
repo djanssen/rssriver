@@ -1,0 +1,60 @@
+<div class="container-fluid" id="content" style="margin-top:20px" xmlns="http://www.w3.org/1999/html" ng-controller="NewFeedSettingsCtrl" >
+    <div class="row-fluid">
+        <div class="span8">
+            <form ng-submit="createRiver()">
+                <fieldset >
+                     
+		       <strong>Url:</strong><input class="input-url" type="text" ng-model="data.Url" ng-cloak></input><br/>
+			<strong>Name:</strong><input type="text" id="riverName" ng-model="data.riverName" ng-cloak></input> <input type="checkbox" ng-model="data.settingsMD5Names" style="margin:2px">auto generated</input><br/><br/>
+                     <span class="input uneditable-input" ng-model="data.createRiverPath" ng-cloak>{{data.host}}/_river/{{data.riverName}}/_meta</span>
+			<pre ng-model="data.createRiverQuery" ng-cloak>{{
+				data.query_index + data.settingsIndex + 
+				data.query_type + data.settingsType +
+				data.query_proxyhost + data.settingsProxyHost +
+				data.query_proxyport + data.settingsProxyPort + 
+				data.query_feedname + data.riverName +
+				data.query_url + data.Url +
+				data.query_incremental_dates +  data.settingsIncrementalDates+ 
+				data.query_end
+				|jsonlint}}
+			</pre>
+                    <button type="submit" class="btn">Create</button>
+                </fieldset>
+            </form>
+        </div>
+
+        <div class="span2" >
+            <div class="row-fluid">
+                <div class="span2">
+                    <a>
+                        <span ng-show="data.riverNameMissing"
+                              tooltip-placement="bottom"
+                              tooltip="A valid and unique river name must entered."
+                              class="label label-important" ng-cloak>River Name Missing</span>
+                    </a>
+
+                    <a>
+                        <span ng-show="data.UrlMissing"
+                              tooltip-placement="bottom"
+                              tooltip="A valid url must entered."
+                              class="label label-important" ng-cloak>Url Missing</span>
+                    </a>
+                </div>
+            </div>
+            <div class="alert alert-error" ng-show="data.createError">
+		  Failed	             
+                <rawerror error="{{data.createError}}"></rawerror>
+            </div>
+
+            <div ng-show="data.createResponse">
+                <div class="elasticResponseStatus" style="text-align: center;border: none">
+                    <span class="label" ng-class="{'label-success'}">Created</span>
+                </div>
+
+            </div>
+
+        </div>
+
+
+    </div>
+</div> <!-- /container -->

@@ -1,0 +1,66 @@
+<div class="container-fluid" id="content" style="margin-top:20px" xmlns="http://www.w3.org/1999/html" ng-controller="NewFeedSettingsCtrl">
+    <div class="row-fluid">
+        <div class="span3">
+            <form  ng-submit="saveSettings()">
+                <fieldset >
+
+         		<div class="dropdown" ng-controller="DropdownCtrl">
+		       <strong>Default Index:</strong>
+                	<a class="btn dropdown-toggle" ng-cloak>
+                     	{{data.settingsIndex}} <span class="caret"></span>
+	              </a>
+       	       <ul class="dropdown-menu">
+                     <li ng-repeat="choice in indices">
+                        <a ng-click="$parent.data.settingsIndex= choice">{{choice}}</a>
+                     </li>
+                     </ul>
+            		</div>
+			<br/>
+
+		  	<div class="dropdown" ng-controller="DropdownCtrl" ng-cloak>
+		  	<strong>Default Doc type:</strong>
+	                <a class="btn dropdown-toggle">
+        	          {{data.settingsType}} <span class="caret"></span>
+              	  </a>
+	                <ul class="dropdown-menu">
+       	             <li ng-repeat="choice in types[data.settingsIndex]">
+              	          <a ng-click="$parent.data.settingsType= choice">{{choice}}</a>
+                   	 	</li>
+	                </ul>
+       	      </div>
+			<br/>
+
+
+                    <strong>Default Proxy host:</strong>
+		      <input type="text" ng-model="data.settingsProxyHost" ng-cloak></input><br/>
+
+                    <strong>Default Proxy port:</strong>
+		      <input type="number" ng-model="data.settingsProxyPort" ng-cloak></input><br/>
+
+		      <input type="checkbox" ng-model="data.settingsIncrementalDates" style="margin:2px">Incremental mode</input><br/>
+
+		      <input type="checkbox" ng-model="data.settingsMD5Names" style="margin:2px">Generated MD5 names</input><br/>
+
+                    <button type="submit" class="btn">Save</button>
+                </fieldset>
+            </form>
+        </div>
+
+        <div class="span8">
+            <div class="alert alert-error" ng-show="data.settingsError">
+		  Failed 	
+                <rawerror error="{{data.settingsError}}"></rawerror>
+            </div>
+
+          
+            <div ng-show="data.settingsResponse">
+                <div class="elasticResponseStatus" style="text-align: center;border: none">
+                    <span class="label" ng-class="{'label-success'}">Saved</span>
+                </div>
+            </div>
+
+        </div>
+
+
+    </div>
+</div> <!-- /container -->

@@ -1,0 +1,36 @@
+<div class="container-fluid" id="content" style="margin-top:20px" ng-controller="FeedsCtrl">
+    <div class="row-fluid">
+        <div class="span10 offset1">
+            <table class="table table-bordered" style="width:100%" ng-repeat="(river, feeds) in feed.Feeds">
+              
+                <thead>
+	                <caption>
+				<strong>River : {{river}} </strong> 
+				<button type="submit" class="btn" ng-click="deleteRiver(river); style="float: right;"">Delete</button>
+			</caption>
+		    <tr>
+  		      <td style="width:50px">Feed Name</td>
+  		      <td style="width:50px">Index</td>
+  		      <td style="width:50px">Type</td>
+  		      <td style="width:50px">Node</td>
+  		      <td style="width:100px">Feed Date</td>
+  		      <td style="width:100px">Last Entry Date</td>
+                    <td>Url</td>
+                </tr>
+                </thead>
+                <tbody>
+                <tr ng-repeat="feed in feeds">
+                    <td>{{feed.properties.name}}</td>
+                    <td>{{feed.index.index}}</td>
+                    <td>{{feed.index.type}}</td>
+                    <td>{{feed.node.name}}</td>
+                    <td>{{feed.lastupdated.feed_date}}</td>
+                    <td>{{feed.lastupdated.doc_date}}</td>
+                    <td>{{feed.properties.url}}</td>
+                </tr>
+                </tbody>
+            </table>
+
+           </div>
+    </div>
+</div>
