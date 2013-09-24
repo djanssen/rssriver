@@ -73,10 +73,7 @@ public class RssToJson {
             String lastPrefix = null;
             for (Element foreignMarkup : foreignMarkups) {
                 String prefix = foreignMarkup.getNamespacePrefix();
-                String fieldName = foreignMarkup.getName();
-                String stringValue = foreignMarkup.getValue();
-                Object fieldValue =  JSONValue(stringValue);
-                 if (lastPrefix != prefix) {
+                if (lastPrefix != prefix) {
 
                     if (lastPrefix != null && !lastPrefix.equals("")) {
                         out = out.endObject();
@@ -85,9 +82,18 @@ public class RssToJson {
                         out = out.startObject(prefix);
                     }
                 }
-         
                 lastPrefix = prefix;
-                out.field(fieldName, fieldValue);
+                
+                String fieldName = foreignMarkup.getName();
+                List<Element> childs = (List<Element>) foreignMarkup.getChildren();
+                if (childs.size() != 0) {
+                     toJsonChildren(childs, fieldName, out);
+                } else
+                {
+                   String stringValue = foreignMarkup.getValue();
+                   Object fieldValue =  JSONValue(stringValue);
+                   out.field(fieldName, fieldValue);
+                }
             }
             if (lastPrefix != null && !lastPrefix.equals("")) {
                 out = out.endObject();
@@ -97,6 +103,24 @@ public class RssToJson {
        
         
         return out.endObject();
+    }
+
+    private static  void toJsonChildren(List<Element> childs, String fieldName, XContentBuilder out) throws IOException
+    {
+        out = out.startObject(fieldName);
+        for (Element child : childs) {
+                String childfieldName = child.getName();
+                List<Element> subchilds = (List<Element>) child.getChildren();
+                if (subchilds.size() != 0) {
+                    toJsonChildren(subchilds, childfieldName, out);
+                }
+                else {
+                      String stringValue = child.getValue();
+                      Object fieldValue =  JSONValue(stringValue);
+                      out.field(childfieldName, fieldValue);
+                }
+        }
+        out = out.endObject();
     }
 
     private static Map<String, Object> getPosition(SyndEntry message) {
