@@ -6,17 +6,8 @@
                      
 		       <strong>Url:</strong><input class="input-url" type="text" ng-model="data.Url" ng-cloak></input><br/>
 			<strong>Name:</strong><input type="text" id="riverName" ng-model="data.riverName" ng-cloak></input> <input type="checkbox" ng-model="data.settingsMD5Names" style="margin:2px">auto generated</input><br/><br/>
-                     <span class="input uneditable-input" ng-model="data.createRiverPath" ng-cloak>{{data.host}}/_river/{{data.riverName}}/_meta</span>
-			<pre ng-model="data.createRiverQuery" ng-cloak>{{
-				data.query_index + data.settingsIndex + 
-				data.query_type + data.settingsType +
-				data.query_proxyhost + data.settingsProxyHost +
-				data.query_proxyport + data.settingsProxyPort + 
-				data.query_feedname + data.riverName +
-				data.query_url + data.Url +
-				data.query_incremental_dates +  data.settingsIncrementalDates+ 
-				data.query_end
-				|jsonlint}}
+                     <span class="input uneditable-input" ng-cloak>{{createRiverPath}}</span>
+			<pre ng-cloak>{{data.createRiverQuery|jsonlint}}
 			</pre>
                     <button type="submit" class="btn">Create</button>
                 </fieldset>

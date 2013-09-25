@@ -2,10 +2,10 @@ angular.module('rssriver.service', [])
     .value('Data', {
         host: "http://localhost:9200",
 
-	 riverName: "",
+	    riverName: "",
         Url: "",
   
-	 settingsIndex: "",
+	    settingsIndex: "",
         settingsType: "",
         settingsProxyHost: "",
         settingsProxyPort: 2402,
@@ -17,18 +17,12 @@ angular.module('rssriver.service', [])
 
 
 
-	 createRiverPath:  '',
- 	 createRiverQuery:  '',
-        query_index : '{ "type": "rss", "index": { "index": "',
-        query_type : '", "type": "',
-        query_proxyhost : '" }, "rss": {"proxyhost": "',
-        query_proxyport: '", "proxyport": ',
- 	 query_feedname: ', "feeds": [ { "name": "',
- 	 query_url: '", "url": "',
-	 query_incremental_dates: '", "update_rate": 18000, "incremental_dates": ',
-	 query_end : ' } ] }}',
+	    createRiverPath:  '',
+ 	    createRiverQuery:  '',
+        
         elasticResponse: "",
         elasticError: [],
+        
         mapping: {} ,
 
         tabs:['Feeds', 'New Feed', 'Settings']

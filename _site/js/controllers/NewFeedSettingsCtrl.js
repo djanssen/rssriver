@@ -1,5 +1,9 @@
-function isUndefined(value) {
-    return typeof value === "undefined";
+function isUndefinedOrEmpty(value) {
+    if (typeof value === "undefined")
+        return true;
+    if (!value)
+        return true;
+    return false;
 }
 
 function NewFeedSettingsCtrl($scope, $http, $filter, Data){
@@ -13,43 +17,46 @@ function NewFeedSettingsCtrl($scope, $http, $filter, Data){
         else{
             $scope.data.riverNameMissing = false;
         }
+        $scope.setQuery();
     });
 
 
-    $scope.$watch('data.Url', function(value){
+    $scope.$watch('data.Url', function(value) {
         if ($scope.data.Url === '') {
             $scope.data.UrlMissing = true;
             return;
         }
-        else{
-        	if (isUndefined($scope.data.Url)) {
-            		$scope.data.UrlMissing = true;
-            		return;
-        	}
+        else {
+            if (isUndefinedOrEmpty($scope.data.Url)) {
+                $scope.data.UrlMissing = true;
+                return;
+            }
 
             $scope.data.UrlMissing = false;
 
-	     if ($scope.data.settingsMD5Names) {
-	           var hash_code = md5($scope.data.Url); 
-		    $scope.data.riverName =  hash_code.substring(8);
- 
-  	     }
+            if ($scope.data.settingsMD5Names) {
+                var hash_code = md5($scope.data.Url);
+                $scope.data.riverName = hash_code.substring(8);
+
+            }
         }
+        $scope.setQuery();
     });
 
 
-    $scope.$watch('data.settingsMD5Names', function(value){
+    $scope.$watch('data.settingsMD5Names', function(value) {
         if ($scope.data.settingsMD5Names) {
-		var riverNameInput = document.getElementById("riverName");
-		riverNameInput.readonly = true; 
-		riverNameInput.disabled = true;
+            var riverNameInput = document.getElementById("riverName");
+            riverNameInput.readonly = true;
+            riverNameInput.disabled = true;
         }
-        else{
-		var riverNameInput = document.getElementById("riverName");
-		riverNameInput.readonly= false;
-		riverNameInput.disabled = false;
+        else {
+            var riverNameInput = document.getElementById("riverName");
+            riverNameInput.readonly = false;
+            riverNameInput.disabled = false;
 
-       }
+        }
+        $scope.setQuery();
     });
 
  
@@ -86,7 +93,10 @@ function NewFeedSettingsCtrl($scope, $http, $filter, Data){
 				}
 				if (typeof (response._source.rss.start_date) == 'string') {
 					$scope.data.settingsStartDate= response._source.rss.start_date;
-				}
+           	}
+	        // set RSS river _meta request
+	        $scope.setQuery();
+  
 			}
             })
             .error(function(data, status, headers, config){
@@ -95,19 +105,29 @@ function NewFeedSettingsCtrl($scope, $http, $filter, Data){
             });
     };
 
-    $scope.saveSettings= function() 
-    {
+    $scope.saveSettings = function() {
 
-        var path = $scope.data.host  + '/_river/rss/_settings';
-        var query = '{  "index": {  "type": "' + $scope.data.settingsType + '",  "index": "' + $scope.data.settingsIndex + '" }, "rss": { "proxyhost": "' +  $scope.data.settingsProxyHost + '",  "proxyport": ' + $scope.data.settingsProxyPort+ ',  "update_rate": ' +  $scope.data.settingsUpdateRate + ',  "incremental_dates": ' + $scope.data.settingsIncrementalDates + ', "md5_names": ' +  $scope.data.settingsMD5Names  + '} }';
+        var path = $scope.data.host + '/_river/rss/_settings';
+        var query = '{ ';
+        query = query + ' "index": {';
+        if (!isUndefinedOrEmpty($scope.data.settingsIndex)) {
+            query = query + ' "index": "' + $scope.data.settingsIndex + '" ';
+            if (!isUndefinedOrEmpty($scope.data.settingsType)) {
+                query = query + ', "type": "' + $scope.data.settingsType + '" ';
+            }
+        }
+        query = query + '} ';
+        query = query + ', "rss": { "proxyhost": "' +  $scope.data.settingsProxyHost + '",  "proxyport": ' + $scope.data.settingsProxyPort+ ',  "update_rate": ' +  $scope.data.settingsUpdateRate + ',  "incremental_dates": ' + $scope.data.settingsIncrementalDates + ', "md5_names": ' +  $scope.data.settingsMD5Names  + '} '; 
+        query = query + '} ';
+
 
         $http.put(path, query)
-            .success(function(response){
+            .success(function(response) {
                 $scope.data.settingsError = [];
                 $scope.data.settingsResponse = response;
                 console.log(response);
             })
-            .error(function(data, status, headers, config){
+            .error(function(data, status, headers, config) {
                 $scope.data.settingsResponse = [];
                 $scope.data.settingsValidation = [];
                 if (status == '400')
@@ -115,14 +135,14 @@ function NewFeedSettingsCtrl($scope, $http, $filter, Data){
                 else {
 
                     $errorMessage = data.error.split(/(.*?)\[([\s\S]+)\]?/);
-                    var errorData = {Error: "", details: [], rawError : "", status: status};
+                    var errorData = { Error: "", details: [], rawError: "", status: status };
 
                     errordata.rawError = data;
                     errordata.Error = $errorMessage[1];
 
                     var nested = $errorMessage[2].split("nested:");
 
-                    for (i in nested){
+                    for (i in nested) {
                         var tempObject = {};
                         if (i == 0) {
                             tempObject.errorName = "Error";
@@ -142,22 +162,39 @@ function NewFeedSettingsCtrl($scope, $http, $filter, Data){
             });
     };
 
+    $scope.setQuery = function() {
+
+        $scope.data.createRiverPath = $scope.data.host + '/_river/' + $scope.data.riverName + '/_meta';
+
+        $scope.data.createRiverQuery = '{ ';
+        $scope.data.createRiverQuery += '  "type": "rss"'
+        if (!isUndefinedOrEmpty($scope.data.settingsIndex)) {
+            $scope.data.createRiverQuery += ', "index": {' + 
+                                                 '  "index": "' + $scope.data.settingsIndex + '" ';
+            if (!isUndefinedOrEmpty($scope.data.settingsType)) {
+                $scope.data.createRiverQuery +=  ', "type": "' + $scope.data.settingsType + '" ';
+            }
+            $scope.data.createRiverQuery +=   '} ';
+        }
+        
+        $scope.data.createRiverQuery += ', "rss": {  "proxyhost": "' +  $scope.data.settingsProxyHost + '"' +
+                                  ', "proxyport": ' + $scope.data.settingsProxyPort + 
+                                  ', "feeds": [ { ' +
+                                        '  "name": "' + $scope.data.riverName + '"' +
+                                        ', "url": "' + $scope.data.Url + '"' +
+                                        ', "update_rate": ' +  $scope.data.settingsUpdateRate +
+                                        ', "incremental_dates": ' + $scope.data.settingsIncrementalDates + 
+                                        '} ]' + 
+                                   '}';
+        $scope.data.createRiverQuery +=  '} ';
+        
+        
+				
+    };
 
     $scope.createRiver = function() {
 
-        var path = $scope.data.host  + '/_river/' + $scope.data.riverName + '/_meta';
-        var query = $scope.data.query_index + $scope.data.settingsIndex + 
-				$scope.data.query_type + $scope.data.settingsType +
-				$scope.data.query_proxyhost + $scope.data.settingsProxyHost +
-				$scope.data.query_proxyport + $scope.data.settingsProxyPort + 
-				$scope.data.query_feedname + $scope.data.riverName +
-				$scope.data.query_url + $scope.data.Url +
-				$scope.data.query_incremental_dates +  $scope.data.settingsIncrementalDates + 
-				$scope.data.query_end;
-
-
-
-        $http.put(path, query)
+        $http.put($scope.data.createRiverPath, $scope.data.createRiverQuery)
             .success(function(response){
                 $scope.data.createError = [];
                 $scope.data.createResponse = response;
@@ -198,7 +235,7 @@ function NewFeedSettingsCtrl($scope, $http, $filter, Data){
             });
     };
 
-    // load saved settings from elasticsearch _river/rss/_settings document 
-    $scope.loadSettings();
-
+    // load saved settings from elasticsearch _river/rss/_settings document
+      $scope.loadSettings();
+  
 }
