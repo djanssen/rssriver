@@ -117,7 +117,9 @@ public class RssToJson {
                 else {
                       String stringValue = child.getValue();
                       Object fieldValue =  JSONValue(stringValue);
-                      out.field(childfieldName, fieldValue);
+                      if (fieldValue != null) {
+                        out.field(childfieldName, fieldValue);
+                      }
                 }
         }
         out = out.endObject();

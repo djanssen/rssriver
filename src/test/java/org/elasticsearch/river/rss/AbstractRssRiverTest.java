@@ -127,7 +127,7 @@ public abstract class AbstractRssRiverTest {
 				.execute().actionGet();
 		
 		// Let's wait x seconds 
-		Thread.sleep(waitingTime() * 1000);
+		Thread.sleep(3 * 1000);
 	}
 
 }

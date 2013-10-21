@@ -19,6 +19,13 @@
 
 package org.elasticsearch.river.rss;
 
+import java.util.LinkedHashMap;
+import org.elasticsearch.cluster.ClusterState;
+import org.elasticsearch.cluster.metadata.IndexMetaData;
+import org.elasticsearch.cluster.metadata.MappingMetaData;
+import java.util.Set;
+import org.elasticsearch.action.admin.cluster.state.ClusterStateRequest;
+import org.elasticsearch.client.Requests;
 import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHits;
@@ -162,8 +169,16 @@ public class RssRiver extends AbstractRiverComponent implements River {
 	public void start() {
 		if (logger.isInfoEnabled()) logger.info("Starting rss stream");
 		try {
-			client.admin().indices().prepareCreate(indexName).execute()
+                     ClusterStateRequest clusterStateRequest = Requests.clusterStateRequest().filterRoutingTable(true).filterNodes(true);
+
+                     // retrieve indices and aliases
+                     Set<String> setIndices= client.admin().cluster().state(clusterStateRequest).actionGet().getState().getMetaData().indices().keySet();
+                     Set<String> setAliases= client.admin().cluster().state(clusterStateRequest).actionGet().getState().getMetaData().aliases().keySet();
+
+                     if (!setIndices.contains(indexName) && !setAliases.contains(indexName)) {
+                  	client.admin().indices().prepareCreate(indexName).execute()
 					.actionGet();
+                    }
 		} catch (Exception e) {
 			if (ExceptionsHelper.unwrapCause(e) instanceof IndexAlreadyExistsException) {
 				// that's fine
@@ -288,7 +303,7 @@ public class RssRiver extends AbstractRiverComponent implements River {
 		
                                 // get last dates for this feed 
                                 String lastupdateField = "_lastupdated_" + feedname;
-                                RiverUpdatedInfo riverInfo = retrieveLastDatesFromRiver(lastupdateField);
+                                RiverUpdatedInfo riverInfo = RetrieveLastDates(lastupdateField);
 
                                  if (logger.isDebugEnabled()) logger.debug("lastupdateField  :  {}, {}, {}", lastupdateField, riverInfo.lastFeedDate, riverInfo.lastDocDate);
 
@@ -363,25 +378,30 @@ public class RssRiver extends AbstractRiverComponent implements River {
                             if (logger.isTraceEnabled()) {
                                 logger.trace("processing [_seq  ]: [{}]/[{}]/[{}], last_seq [{}]", indexName, riverName.name(), lastupdateField, currentFeedDate);
                             }
-                            // We store the lastupdate date
-                            bulk.add(indexRequest("_river").type(riverName.name()).id(lastupdateField)
-                                    .source(jsonBuilder().startObject().startObject("rss").field("feed_date", currentFeedDate).field("doc_date", currentDocDate).endObject().endObject()));
                         } catch (IOException e) {
-                            updatedCount = 0;
+                            updatedCount = -1;
                             logger.warn("failed to add feed message entry to bulk indexing");
                         }
 
-                        try {
-                            BulkResponse response = bulk.execute().actionGet();
-                            if (response.hasFailures()) {
-                                // TODO probably some of them has been updated
-                                updatedCount = 0;
-                                // TODO write to exception queue?
-                                logger.warn("failed to execute" + response.buildFailureMessage());
+                        if (updatedCount > 0)
+                        {
+                            try {
+                                BulkResponse response = bulk.execute().actionGet();
+                                if (response.hasFailures()) {
+                                    // TODO probably some of them has been updated
+                                    updatedCount = -1;
+                                    // TODO write to exception queue?
+                                    logger.warn("failed to execute" + response.buildFailureMessage());
+                                }
+                            } catch (Exception e) {
+                                updatedCount = -1;
+                                logger.warn("failed to execute bulk", e);
                             }
-                        } catch (Exception e) {
-                            updatedCount = 0;
-                            logger.warn("failed to execute bulk", e);
+                        }
+
+                        if (updatedCount >= 0) {
+                            // we store the lastupdate
+                            StoreLastDates(lastupdateField, currentFeedDate, currentDocDate);
                         }
 
                     } else {
@@ -422,7 +442,27 @@ public class RssRiver extends AbstractRiverComponent implements River {
 }
 
         @SuppressWarnings("unchecked")
-		private RiverUpdatedInfo retrieveLastDatesFromRiver(String lastupdateField) {
+		private void StoreLastDates(String lastupdateField, Date currentFeedDate,  Date currentDocDate) {
+                    // we store the lastupdate
+                   BulkRequestBuilder bulk = client.prepareBulk();
+                    try {
+                        bulk.add(indexRequest("_river").type(riverName.name()).id(lastupdateField)
+                                        .source(jsonBuilder().startObject().startObject("rss").field("feed_date", currentFeedDate).field("doc_date", currentDocDate).endObject().endObject()));
+                    } catch (IOException e) {
+                        logger.warn("failed to add lastupdate  entry to bulk indexing");
+                    }
+                    try {
+                        BulkResponse response = bulk.execute().actionGet();
+                        if (response.hasFailures()) {
+                            logger.warn("lastupdate : failed to execute" + response.buildFailureMessage());
+                        }
+                    } catch (Exception e) {
+                        logger.warn("lastupdate : failed to execute bulk", e);
+                    }
+            }
+
+        @SuppressWarnings("unchecked")
+		private RiverUpdatedInfo RetrieveLastDates(String lastupdateField) {
                 RiverUpdatedInfo result = new RiverUpdatedInfo();
                 try {
                 // Do something
@@ -450,15 +490,27 @@ public class RssRiver extends AbstractRiverComponent implements River {
 
                     SearchRequestBuilder searchBuilder = client.prepareSearch(indexName);
                     if (searchBuilder != null) {
-                        SearchHits lastDocs = searchBuilder.setTypes(typeName)
+
+                        ClusterState cs = client.admin().cluster().prepareState().setFilterIndices(indexName).execute().actionGet().getState();
+                        IndexMetaData imd = cs.getMetaData().index(indexName);
+                        MappingMetaData metad = imd.mapping(typeName);
+
+                         if (metad != null) {
+                             LinkedHashMap<String, Object> structure = (LinkedHashMap<String, Object>)metad.getSourceAsMap().get("properties");
+                            if  (structure != null && structure.containsKey("feedDate")) {
+                        
+
+                                SearchHits lastDocs = searchBuilder.setTypes(typeName)
                                                         .setSearchType(SearchType.DFS_QUERY_THEN_FETCH)
                                                         .setQuery(QueryBuilders.termQuery("feedname", feedname))
                                                         .addSort("feedDate", SortOrder.DESC)   // Sort by feedDate
                                                         .setSize(1)
                                                         .execute()
                                                         .actionGet().getHits();
-                        if (lastDocs != null && lastDocs.getTotalHits() > 0) {
-                            result.lastDocDate  = ISODateTimeFormat.dateOptionalTimeParser().parseDateTime(lastDocs.getAt(0).getSource().get("updatedDate").toString()).toDate();
+                                if (lastDocs != null && lastDocs.getTotalHits() > 0) {
+                                    result.lastDocDate  = ISODateTimeFormat.dateOptionalTimeParser().parseDateTime(lastDocs.getAt(0).getSource().get("updatedDate").toString()).toDate();
+                                }
+                             }
                         }
                     }
 

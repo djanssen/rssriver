@@ -19,6 +19,8 @@
 
 package org.elasticsearch.river.rss;
 
+import org.elasticsearch.common.xcontent.XContentBuilder;
+import com.sun.syndication.feed.synd.SyndEntry;
 import com.sun.syndication.feed.rss.Channel;
 import com.sun.syndication.feed.synd.SyndFeed;
 import com.sun.syndication.io.SyndFeedInput;
@@ -30,6 +32,7 @@ import java.net.URL;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
+import static org.elasticsearch.river.rss.RssToJson.toJson;
 
 public class RomeTest {
 
@@ -44,6 +47,30 @@ public class RomeTest {
 
 		assertNotNull(feed);
 		assertFalse(feed.getEntries().isEmpty());
+
+
+
+
+
+               for (SyndEntry message : (Iterable<SyndEntry>) feed.getEntries()) {
+
+                    XContentBuilder json = toJson(message, "rometest", "rometest");
+                    String text = json.string();
+                    String keep = text;
+              }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         assertNotNull(feed.originalWireFeed());
         assertTrue(feed.originalWireFeed() instanceof Channel);
