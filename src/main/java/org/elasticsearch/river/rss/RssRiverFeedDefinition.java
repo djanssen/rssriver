@@ -94,9 +94,9 @@ public class RssRiverFeedDefinition {
        private void setStartDate(String startDate)
         {
             if (startDate == null) {
-                Date last7days = new Date();
-                last7days.setTime(last7days.getTime() - (7 * 24 * 60 * 60 * 1000));
-                this.startDate = last7days;
+                Date last3days = new Date();
+                last3days.setTime(last3days.getTime() - (3 * 24 * 60 * 60 * 1000));
+                this.startDate = last3days;
                 return;
             }
             try {
