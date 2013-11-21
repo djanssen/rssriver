@@ -19,6 +19,9 @@
 
 package org.elasticsearch.river.rss;
 
+import java.util.Iterator;
+import java.util.ArrayList;
+import java.util.Hashtable;
 import java.util.Date;
 import com.sun.syndication.feed.synd.SyndContent;
 import java.util.List;
@@ -107,22 +110,65 @@ public class RssToJson {
 
     private static  void toJsonChildren(List<Element> childs, String fieldName, XContentBuilder out) throws IOException
     {
-        out = out.startObject(fieldName);
+        Map childsByName = new Hashtable() ;
+
+        out = (fieldName != null) ? out.startObject(fieldName) : out.startObject();
+        
+        // build elements list for each child name 
         for (Element child : childs) {
-                String childfieldName = child.getName();
-                List<Element> subchilds = (List<Element>) child.getChildren();
-                if (subchilds.size() != 0) {
-                    toJsonChildren(subchilds, childfieldName, out);
+            String childName = child.getName();
+            ArrayList<Element> childValues =  (ArrayList<Element>) childsByName.get(childName);
+            if (childValues == null)
+                childValues = new ArrayList<Element>();
+            childValues.add(child);
+            childsByName.put(childName, childValues);
+        }
+
+        Iterator it = childsByName.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry pairs = (Map.Entry)it.next();
+            String childName = (String) pairs.getKey();
+            ArrayList<Element> childValues  = ( ArrayList<Element>) pairs.getValue();
+
+            // single element
+            if(childValues.size() == 1)
+            {
+                Element childvalue = childValues.get(0);
+                List<Element> subchilds = (List<Element>) childvalue.getChildren();
+                if (!subchilds.isEmpty()) {
+                    toJsonChildren(subchilds, childName, out);
+                } else {
+                    String stringValue = childvalue.getValue();
+                    Object fieldValue =  JSONValue(stringValue);
+                    if (!stringValue.isEmpty() && fieldValue != null) {
+                        out.field(childName, fieldValue);
+                    }
                 }
-                else {
-                      String stringValue = child.getValue();
-                      Object fieldValue =  JSONValue(stringValue);
-                      if (fieldValue != null) {
-                        out.field(childfieldName, fieldValue);
-                      }
+            }
+            // array
+            else {
+              
+               out.startArray(childName);
+                for (Element childvalue : childValues) {
+                    List<Element> subchilds = (List<Element>) childvalue.getChildren();
+                    if (!subchilds.isEmpty()) {
+                        toJsonChildren(subchilds, null, out);
+                    } else {
+                        String stringValue = childvalue.getValue();
+                        Object arrayValue =  JSONValue(stringValue);
+                        if (arrayValue != null) {
+                            out.value(arrayValue);
+                        }
+                    }
+
                 }
+                out.endArray();
+
+              
+            }
         }
         out = out.endObject();
+          
     }
 
     private static Map<String, Object> getPosition(SyndEntry message) {
