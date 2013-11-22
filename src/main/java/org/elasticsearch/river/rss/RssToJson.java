@@ -93,9 +93,11 @@ public class RssToJson {
                      toJsonChildren(childs, fieldName, out);
                 } else
                 {
-                   String stringValue = foreignMarkup.getValue();
+                   String stringValue = trim(foreignMarkup.getValue()," \t\n");
                    Object fieldValue =  JSONValue(stringValue);
-                   out.field(fieldName, fieldValue);
+                   if (!stringValue.isEmpty() && fieldValue != null) {
+                        out.field(fieldName, fieldValue);
+                    }
                 }
             }
             if (lastPrefix != null && !lastPrefix.equals("")) {
@@ -138,7 +140,7 @@ public class RssToJson {
                 if (!subchilds.isEmpty()) {
                     toJsonChildren(subchilds, childName, out);
                 } else {
-                    String stringValue = childvalue.getValue();
+                    String stringValue = trim(childvalue.getValue()," \t\n");
                     Object fieldValue =  JSONValue(stringValue);
                     if (!stringValue.isEmpty() && fieldValue != null) {
                         out.field(childName, fieldValue);
@@ -154,7 +156,7 @@ public class RssToJson {
                     if (!subchilds.isEmpty()) {
                         toJsonChildren(subchilds, null, out);
                     } else {
-                        String stringValue = childvalue.getValue();
+                        String stringValue = trim(childvalue.getValue()," \t\n");
                         Object arrayValue =  JSONValue(stringValue);
                         if (arrayValue != null) {
                             out.value(arrayValue);
@@ -215,6 +217,20 @@ public class RssToJson {
         return value;
     }
 
+     private static String trim(String s, String toTrim)
+     {
+        int originalLen = s.length();
+        int len = s.length();
+        int st = 0;
+
+        while ((st < len) && (toTrim.indexOf(s.charAt(st)) != -1)) {
+            st++;
+        }
+        while ((st < len) && (toTrim.indexOf(s.charAt(len - 1)) != -1)) {
+            len--;
+        }
+        return ((st > 0) || (len < originalLen)) ? s.substring(st, len) : s.toString();
+    }
 }
 
 
