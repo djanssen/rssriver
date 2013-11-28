@@ -19,6 +19,7 @@
 
 package org.elasticsearch.river.rss;
 
+import org.jdom.Attribute;
 import java.util.Iterator;
 import java.util.ArrayList;
 import java.util.Hashtable;
@@ -39,6 +40,8 @@ import java.util.Map;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 
 public class RssToJson {
+       enum ElementType {ROOT, ARRAY, NAMED} ;
+
 	public static XContentBuilder toJson(SyndEntry message, String riverName, String feedName) throws IOException {
         final Map<String, Object> latitude = getPosition(message);
         final List<SyndContent> contents = message.getContents();
@@ -70,55 +73,55 @@ public class RssToJson {
         // process foreign markup elements
         // following the index destination mapping
         List<Element> foreignMarkups = (List<Element>) message.getForeignMarkup();
-
-        if (foreignMarkups != null)
-        {
-            String lastPrefix = null;
-            for (Element foreignMarkup : foreignMarkups) {
-                String prefix = foreignMarkup.getNamespacePrefix();
-                if (lastPrefix != prefix) {
-
-                    if (lastPrefix != null && !lastPrefix.equals("")) {
-                        out = out.endObject();
-                    }
-                    if (prefix != null && !prefix.equals("")) {
-                        out = out.startObject(prefix);
-                    }
-                }
-                lastPrefix = prefix;
-                
-                String fieldName = foreignMarkup.getName();
-                List<Element> childs = (List<Element>) foreignMarkup.getChildren();
-                if (childs.size() != 0) {
-                     toJsonChildren(childs, fieldName, out);
-                } else
-                {
-                   String stringValue = trim(foreignMarkup.getValue()," \t\n");
-                   Object fieldValue =  JSONValue(stringValue);
-                   if (!stringValue.isEmpty() && fieldValue != null) {
-                        out.field(fieldName, fieldValue);
-                    }
-                }
-            }
-            if (lastPrefix != null && !lastPrefix.equals("")) {
-                out = out.endObject();
-           }
-        }
-
+        Element2Json(ElementType.ROOT,  null, null, new ArrayList<Attribute>(), foreignMarkups, out);
        
         
         return out.endObject();
     }
 
-    private static  void toJsonChildren(List<Element> childs, String fieldName, XContentBuilder out) throws IOException
-    {
-        Map childsByName = new Hashtable() ;
 
-        out = (fieldName != null) ? out.startObject(fieldName) : out.startObject();
-        
+    private static  void Element2Json(ElementType elementType, String elementName, String elementValue, List<Attribute> attributes, List<Element> childs, XContentBuilder out) throws IOException
+    {
+
+        // simple element wihtout any children or attributes
+        if (attributes.isEmpty() && childs.isEmpty())
+        {
+            String stringValue = trim(elementValue," \t\n");
+            Object objectValue =  JSONValue(stringValue);
+            if (!stringValue.isEmpty() && objectValue != null) {
+                if (elementType != ElementType.ARRAY)
+                    out.field(elementName, objectValue);
+                else
+                    out.value(objectValue);
+            }
+            return;
+        }
+ 
+        if (elementType != ElementType.ROOT)
+        {
+            if (elementType == ElementType.ARRAY)
+                out = out.startObject();
+            if (elementType == ElementType.NAMED)
+                out = out.startObject(elementName);
+        }
+
+        // handle attributes
+         for (Attribute attribute : attributes)
+         {
+            String attributePrefix = attribute.getNamespacePrefix();
+            String attributeName = (attributePrefix.isEmpty()) ? attribute.getName() : attributePrefix + ":" + attribute.getName();
+            String stringValue = trim(attribute.getValue()," \t\n");
+            Object attributeValue =  JSONValue(stringValue);
+            if (!stringValue.isEmpty() && attributeValue != null) {
+                out.field(attributeName, attributeValue);
+            }
+         }
+
+         Map childsByName = new Hashtable() ;
         // build elements list for each child name 
         for (Element child : childs) {
-            String childName = child.getName();
+            String childPrefix = child.getNamespacePrefix();
+            String childName = (childPrefix.isEmpty()) ? child.getName() : childPrefix + ":" + child.getName();
             ArrayList<Element> childValues =  (ArrayList<Element>) childsByName.get(childName);
             if (childValues == null)
                 childValues = new ArrayList<Element>();
@@ -133,44 +136,29 @@ public class RssToJson {
             ArrayList<Element> childValues  = ( ArrayList<Element>) pairs.getValue();
 
             // single element
+            boolean isArray =  childValues.size() > 1;
             if(childValues.size() == 1)
             {
-                Element childvalue = childValues.get(0);
-                List<Element> subchilds = (List<Element>) childvalue.getChildren();
-                if (!subchilds.isEmpty()) {
-                    toJsonChildren(subchilds, childName, out);
-                } else {
-                    String stringValue = trim(childvalue.getValue()," \t\n");
-                    Object fieldValue =  JSONValue(stringValue);
-                    if (!stringValue.isEmpty() && fieldValue != null) {
-                        out.field(childName, fieldValue);
-                    }
-                }
+                String childValue = childValues.get(0).getValue();
+                List<Attribute> childAttributes = childValues.get(0).getAttributes();
+                List<Element> childChilds = childValues.get(0).getChildren();
+                Element2Json(ElementType.NAMED, childName, childValue, childAttributes, childChilds, out);
             }
             // array
             else {
-              
-               out.startArray(childName);
+                out.startArray(childName);
                 for (Element childvalue : childValues) {
-                    List<Element> subchilds = (List<Element>) childvalue.getChildren();
-                    if (!subchilds.isEmpty()) {
-                        toJsonChildren(subchilds, null, out);
-                    } else {
-                        String stringValue = trim(childvalue.getValue()," \t\n");
-                        Object arrayValue =  JSONValue(stringValue);
-                        if (arrayValue != null) {
-                            out.value(arrayValue);
-                        }
-                    }
-
+                    String childValue = childvalue.getValue();
+                    List<Attribute> childAttributes = childvalue.getAttributes();
+                    List<Element> childChilds = childvalue.getChildren();
+                    Element2Json(ElementType.ARRAY, childName, childValue, childAttributes, childChilds, out);
                 }
                 out.endArray();
-
-              
             }
         }
-        out = out.endObject();
-          
+
+        if (elementType != ElementType.ROOT)
+           out = out.endObject();
     }
 
     private static Map<String, Object> getPosition(SyndEntry message) {
